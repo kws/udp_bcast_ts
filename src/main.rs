@@ -45,10 +45,7 @@ fn parse_ip(s: &str, flag: &str) -> Result<IpAddr, String> {
 }
 
 /// Helper function to get the next argument value or return an error.
-fn get_arg_value(
-    it: &mut impl Iterator<Item = String>,
-    flag: &str,
-) -> Result<String, String> {
+fn get_arg_value(it: &mut impl Iterator<Item = String>, flag: &str) -> Result<String, String> {
     match it.next() {
         Some(v) if !v.is_empty() => Ok(v),
         _ => Err(format!("Missing value for {flag}")),
@@ -62,7 +59,9 @@ fn error_exit(msg: &str, program: &str, code: u8) -> ExitCode {
 }
 
 fn main() -> ExitCode {
-    let program = env::args().next().unwrap_or_else(|| "udp_bcast_ts".to_string());
+    let program = env::args()
+        .next()
+        .unwrap_or_else(|| "udp_bcast_ts".to_string());
 
     let mut addr: Option<IpAddr> = None;
     let mut port: Option<u16> = None;

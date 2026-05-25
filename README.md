@@ -17,6 +17,15 @@ A lightweight Rust utility that broadcasts Unix timestamps (in milliseconds) ove
 
 ## Compilation
 
+### Checks
+
+```bash
+scripts/check.sh
+```
+
+This runs `cargo fmt --check`, `cargo clippy -- -D warnings`, and
+`cargo test --locked`.
+
 ### Debug Build
 
 ```bash
@@ -39,17 +48,42 @@ The release profile is configured with:
 - Panic abort (smaller binary)
 - Symbol stripping
 
-### Cross-compilation
+### Linux x86_64 Release Artifact
 
-For cross-compilation (e.g., for Raspberry Pi), install the appropriate target:
+Release assets are built on Linux x86_64 builders:
 
 ```bash
-# Example: ARMv7 (Raspberry Pi)
-rustup target add armv7-unknown-linux-gnueabihf
-
-# Build for target
-cargo build --release --target armv7-unknown-linux-gnueabihf
+scripts/build-linux-x86_64.sh v0.1.0
 ```
+
+The script writes:
+
+- `dist/udp_bcast_ts-v0.1.0-x86_64-unknown-linux-gnu`
+- `dist/udp_bcast_ts-v0.1.0-x86_64-unknown-linux-gnu.sha256`
+
+GitHub releases use the same asset names.
+
+### Cutting a Release
+
+The release scripts require `jq` in addition to Rust and Cargo. Update
+`Cargo.toml` first if the release version changes, then run:
+
+```bash
+scripts/release.sh v0.1.0
+```
+
+The release script verifies that:
+
+- the working tree is clean
+- the current branch is `main`
+- local `main` matches `origin/main`
+- the tag does not already exist locally or on `origin`
+- the tag matches the package version in `Cargo.toml`
+- `scripts/check.sh` passes
+
+It then creates and pushes an annotated semver tag. The GitHub Actions release
+workflow builds the Linux x86_64 artifact on Ubuntu 22.04 and attaches the
+binary plus checksum to the GitHub release.
 
 ## Usage
 
@@ -132,6 +166,25 @@ loop {
 - **Send failures**: The program logs errors but continues running to allow recovery from transient network issues
 - **System clock errors**: Program exits if the system clock is set before Unix epoch
 - **Timestamp overflow**: Program exits if the timestamp exceeds `u64::MAX` (unlikely in practice)
+
+## Ansible Install Example
+
+```yaml
+udp_bcast_ts_version: v0.1.0
+udp_bcast_ts_asset: "udp_bcast_ts-{{ udp_bcast_ts_version }}-x86_64-unknown-linux-gnu"
+udp_bcast_ts_base_url: "https://github.com/kws/udp_bcast_ts/releases/download/{{ udp_bcast_ts_version }}"
+
+- name: Install udp_bcast_ts release binary
+  ansible.builtin.get_url:
+    url: "{{ udp_bcast_ts_base_url }}/{{ udp_bcast_ts_asset }}"
+    dest: /usr/local/bin/udp_bcast_ts
+    mode: "0755"
+    checksum: "sha256:{{ lookup('ansible.builtin.url', udp_bcast_ts_base_url + '/' + udp_bcast_ts_asset + '.sha256').split()[0] }}"
+```
+
+The service can suppress the current once-per-send stdout noise with
+`StandardOutput=null` while keeping `StandardError=journal` for send failures
+and startup/runtime errors.
 
 ## License
 
